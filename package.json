@@ -1,5 +1,5 @@
 {
-  "name": "",
+  "name": "contrlve-landing",
   "type": "module",
   "version": "0.0.1",
   "engines": {
@@ -12,6 +12,7 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/cloudflare": "^13.5.3",
     "astro": "^6.1.8"
   }
 }

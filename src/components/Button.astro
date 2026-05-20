@@ -1,0 +1,50 @@
+---
+interface Props {
+  label?: string;
+  href?: string;
+}
+
+const { label = "Дивитись", href } = Astro.props;
+---
+
+{
+  href ? (
+    <a href={href} class="btn">
+      <slot>{label}</slot>
+    </a>
+  ) : (
+    <button class="btn">
+      <slot>{label}</slot>
+    </button>
+  )
+}
+
+<style>
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #e5091a;
+    color: #ffffff;
+    border-radius: 999px;
+    border: none;
+    padding: 0.65rem 1.5rem;
+    font-size: 1rem;
+    font-family: Gothic;
+    max-width: clamp(100px, 60vw, 300px);
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition:
+      background-color 0.2s ease,
+      transform 0.1s ease;
+  }
+
+  .btn:hover {
+    background-color: #c00718;
+  }
+
+  .btn:active {
+    transform: scale(0.97);
+  }
+</style>

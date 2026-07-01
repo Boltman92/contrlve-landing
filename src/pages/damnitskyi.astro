@@ -1,0 +1,268 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout>
+  <main class="wrap">
+    <form id="upload-form" class="card" action="https://damnitskyi-shirts.onrender.com/image" method="post" enctype="multipart/form-data">
+      <h1>Який ти Дамницький сьогодні?</h1>
+
+      <label class="drop" for="image">
+        <img id="preview" alt="" hidden />
+        <span id="hint">натисни, щоб вибрати фото</span>
+        <input id="image" name="image" type="file" accept="image/*" required />
+      </label>
+
+      <div class="actions">
+        <button type="submit" class="btn">згенерувати</button>
+        <button type="button" id="save" class="btn btn-save" hidden>зберегти</button>
+      </div>
+      <p id="status" role="status"></p>
+    </form>
+
+    <div id="loader" class="loader" hidden aria-live="polite">
+      <span class="loader-text">підбираємо твій лук... <br /> нічого не рухай!!</span>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  const form = document.getElementById("upload-form") as HTMLFormElement;
+  const input = document.getElementById("image") as HTMLInputElement;
+  const preview = document.getElementById("preview") as HTMLImageElement;
+  const hint = document.getElementById("hint") as HTMLElement;
+  const status = document.getElementById("status") as HTMLElement;
+  const saveBtn = document.getElementById("save") as HTMLButtonElement;
+  const loader = document.getElementById("loader") as HTMLElement;
+
+  let generated: Blob | null = null;
+
+  // Single source of truth: the Save button is rendered only when a
+  // generated image exists, which only happens after a successful POST.
+  function setGenerated(blob: Blob | null) {
+    generated = blob;
+    saveBtn.hidden = blob === null;
+  }
+
+  function fileFromGenerated(blob: Blob) {
+    const ext = (blob.type.split("/")[1] || "png").split("+")[0];
+    return new File([blob], `contrlve-${Date.now()}.${ext}`, {
+      type: blob.type || "image/png",
+    });
+  }
+
+  input.addEventListener("change", () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    preview.src = URL.createObjectURL(file);
+    preview.hidden = false;
+    hint.textContent = file.name;
+    setGenerated(null);
+  });
+
+  function download(blob: Blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileFromGenerated(blob).name;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  saveBtn.addEventListener("click", () => {
+    if (!generated) return;
+    download(generated);
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    status.textContent = "";
+    setGenerated(null);
+    loader.hidden = false;
+    try {
+      const res = await fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+      });
+      if (!res.ok) {
+        const { error } = await res.json();
+        throw new Error(error);
+      }
+      const blob = await res.blob();
+      preview.src = URL.createObjectURL(blob);
+      preview.hidden = false;
+      hint.textContent = "";
+      setGenerated(blob);
+    } catch (err) {
+      status.textContent = `упсс, щось пішло не так`;
+    } finally {
+      loader.hidden = true;
+    }
+  });
+</script>
+
+<style>
+  @font-face {
+    font-family: Gothic;
+    src: url("/SocialGothicBold.otf");
+    font-display: swap;
+  }
+
+  .wrap {
+    min-height: 100dvh;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+    font-family: Gothic;
+    color: #fff;
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 20px;
+    width: 100%;
+    max-width: 420px;
+    padding: 32px;
+    box-sizing: border-box;
+    background: rgba(10, 10, 10, 0.75);
+    border-radius: 16px;
+    backdrop-filter: blur(6px);
+  }
+
+  h1 {
+    margin: 0;
+    text-align: center;
+    font-size: 1.75rem;
+  }
+
+  .drop {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 340px;
+    flex: 1;
+    padding: 16px;
+    border: 2px dashed rgba(255, 255, 255, 0.35);
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 0.2s ease;
+  }
+
+  .drop:hover {
+    border-color: #e5091a;
+  }
+
+  #preview {
+    max-width: 100%;
+    max-height: 100%;
+    min-height: 0;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+
+  #hint {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.95rem;
+    word-break: break-word;
+  }
+
+  #image {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #e5091a;
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 0.4rem 1rem;
+    font-size: 0.85rem;
+    font-family: Gothic;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background-color 0.2s ease,
+      transform 0.1s ease;
+  }
+
+  .btn[hidden] {
+    display: none;
+  }
+
+  .btn:hover {
+    background-color: #c00718;
+  }
+
+  .btn:active {
+    transform: scale(0.97);
+  }
+
+  .btn-save {
+    background-color: transparent;
+    border: 2px solid #e5091a;
+  }
+
+  .btn-save:hover {
+    background-color: #e5091a;
+  }
+
+  #status {
+    margin: 0;
+    min-height: 1.2em;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .loader {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 10, 10, 0.7);
+    backdrop-filter: blur(4px);
+  }
+
+  .loader[hidden] {
+    display: none;
+  }
+
+  .loader-text {
+    font-family: Gothic;
+    font-size: clamp(1.5rem, 5vw, 2.5rem);
+    color: #fff;
+    text-align: center;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.25);
+    }
+  }
+</style>

@@ -94,8 +94,12 @@ import Layout from "../layouts/Layout.astro";
         body: fd,
       });
       if (!res.ok) {
-        const { error } = await res.json();
-        throw new Error(error);
+        const err = new Error() as Error & { status?: number };
+        err.status = res.status;
+        try {
+          err.message = (await res.json()).error;
+        } catch {}
+        throw err;
       }
       const blob = await res.blob();
       preview.src = URL.createObjectURL(blob);
@@ -103,7 +107,10 @@ import Layout from "../layouts/Layout.astro";
       hint.textContent = "";
       setGenerated(blob);
     } catch (err) {
-      status.textContent = `упсс, щось пішло не так`;
+      status.textContent =
+        (err as { status?: number })?.status === 429
+          ? "та скільки можна? Ви вже здійснили забагато генерацій"
+          : `упсс, щось пішло не так`;
     } finally {
       loader.hidden = true;
     }

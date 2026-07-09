@@ -27,6 +27,10 @@ import Layout from "../layouts/Layout.astro";
 </Layout>
 
 <script>
+  import { compressImage } from "../utils/compressImage";
+
+  const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
+
   const form = document.getElementById("upload-form") as HTMLFormElement;
   const input = document.getElementById("image") as HTMLInputElement;
   const preview = document.getElementById("preview") as HTMLImageElement;
@@ -80,9 +84,14 @@ import Layout from "../layouts/Layout.astro";
     setGenerated(null);
     loader.hidden = false;
     try {
+      const file = input.files?.[0];
+      if (!file) return;
+      const toSend = await compressImage(file, MAX_UPLOAD_BYTES);
+      const fd = new FormData();
+      fd.append("image", toSend, toSend.name);
       const res = await fetch(form.action, {
         method: "POST",
-        body: new FormData(form),
+        body: fd,
       });
       if (!res.ok) {
         const { error } = await res.json();

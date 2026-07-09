@@ -1,0 +1,79 @@
+---
+import {
+  SITE_URL,
+  SITE_NAME,
+  LOCALE,
+  DEFAULT_TITLE,
+  DEFAULT_DESCRIPTION,
+  DEFAULT_OG_IMAGE,
+  OG_IMAGE_WIDTH,
+  OG_IMAGE_HEIGHT,
+  YOUTUBE_URL,
+} from "../consts";
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  type?: "website" | "article";
+  noindex?: boolean;
+  /** Emit WebSite + Organization JSON-LD (home page only). */
+  organizationSchema?: boolean;
+}
+
+const {
+  title = DEFAULT_TITLE,
+  description = DEFAULT_DESCRIPTION,
+  image = DEFAULT_OG_IMAGE,
+  type = "website",
+  noindex = false,
+  organizationSchema = false,
+} = Astro.props;
+
+// Astro.site is configured, but fall back to the constant to stay type-safe.
+const siteBase = Astro.site ?? new URL(SITE_URL);
+const canonical = new URL(Astro.url.pathname, siteBase);
+const imageUrl = new URL(image, siteBase);
+
+const jsonLd = organizationSchema
+  ? {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: SITE_NAME,
+      url: siteBase.href,
+      logo: imageUrl.href,
+      sameAs: [YOUTUBE_URL],
+    }
+  : null;
+---
+
+<title>{title}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical.href} />
+{noindex && <meta name="robots" content="noindex,nofollow" />}
+
+<!-- Open Graph -->
+<meta property="og:type" content={type} />
+<meta property="og:site_name" content={SITE_NAME} />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical.href} />
+<meta property="og:image" content={imageUrl.href} />
+<meta property="og:image:width" content={String(OG_IMAGE_WIDTH)} />
+<meta property="og:image:height" content={String(OG_IMAGE_HEIGHT)} />
+<meta property="og:locale" content={LOCALE} />
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={imageUrl.href} />
+
+{
+  jsonLd && (
+    <script
+      type="application/ld+json"
+      set:html={JSON.stringify(jsonLd)}
+    />
+  )
+}

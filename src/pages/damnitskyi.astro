@@ -1,8 +1,13 @@
 ---
 import Layout from "../layouts/Layout.astro";
+
+export const prerender = true;
 ---
 
-<Layout>
+<Layout
+  title="Який ти Дамницький сьогодні? — ШОУ КОНТРЛВЕ"
+  description="Завантаж своє фото і дізнайся, який ти Дамницький сьогодні. Генератор образів від ШОУ КОНТРЛВЕ."
+>
   <main class="wrap">
     <form id="upload-form" class="card" action="https://damnitskyi-shirts.onrender.com/image" method="post" enctype="multipart/form-data">
       <h1>Який ти Дамницький сьогодні?</h1>

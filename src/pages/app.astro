@@ -1,0 +1,126 @@
+---
+import Layout from "../layouts/Layout.astro";
+import logo from "../assets/logo.webp";
+
+export const prerender = true;
+
+const APP_STORE_URL = "https://apps.apple.com/ua/app/%D0%BA%D0%BE%D0%BD%D1%82%D1%80%D0%BB%D0%B2%D0%B5/id6762404205";
+const GOOGLE_PLAY_URL = "https://play.google.com/store/apps/details?id=com.razbeikov.contrlve";
+---
+
+<Layout
+  title="Гра КОНТРЛВЕ — завантажити застосунок"
+  description="Гра КОНТРЛВЕ для iOS та Android. Завантажуй безкоштовно в App Store або Google Play."
+>
+  <main class="wrap">
+    <section class="card">
+      <img
+        class="logo"
+        src={logo.src}
+        width={logo.width}
+        height={logo.height}
+        alt="ШОУ КОНТРЛВЕ"
+        loading="eager"
+      />
+      <p class="lead">
+        Завантажуй гру КОНТРЛВЕ на свій телефон 
+      </p>
+      <div class="actions">
+        <a class="badge" href={APP_STORE_URL}>
+          <img
+            src="/app-store-badge-ua.svg"
+            width="121"
+            height="41"
+            alt="Завантажити в App Store"
+            loading="eager"
+          />
+        </a>
+        <a class="badge" href={GOOGLE_PLAY_URL}>
+          <img
+            src="/google-play-badge-ua.svg"
+            width="239"
+            height="71"
+            alt="Завантажити в Google Play"
+            loading="eager"
+          />
+        </a>
+      </div>
+    </section>
+  </main>
+</Layout>
+
+<style>
+  @font-face {
+    font-family: Gothic;
+    src: url("/SocialGothicBold.otf");
+    font-display: swap;
+  }
+
+  .wrap {
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+    font-family: Gothic;
+    color: #fff;
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+    max-width: 480px;
+    padding: 32px;
+    box-sizing: border-box;
+    background: rgba(10, 10, 10, 0.75);
+    border-radius: 16px;
+    backdrop-filter: blur(6px);
+  }
+
+  .logo {
+    max-width: clamp(120px, 40vw, 200px);
+    height: auto;
+    aspect-ratio: 600 / 214;
+  }
+
+  h1 {
+    margin: 0;
+    text-align: center;
+    font-size: clamp(1.5rem, 6vw, 2.5rem);
+    line-height: 1.1;
+    font-weight: inherit;
+  }
+
+  .lead {
+    margin: 0;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  /* The two official badges have different aspect ratios (Apple 120.664×41,
+     Google 238.96×70.8), so they are matched on height, not width. Wraps to
+     a stack on its own once both no longer fit on one line. */
+  .actions {
+    --badge-height: clamp(40px, 12vw, 48px);
+
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .badge {
+    display: block;
+  }
+
+  .badge img {
+    display: block;
+    height: var(--badge-height);
+    width: auto;
+  }
+</style>

@@ -1,0 +1,99 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Button from "../components/Button.astro";
+import logo from "../assets/logo.webp";
+
+export const prerender = true;
+
+// Links to be filled in once booking URLs are ready.
+const sessions = [
+  { time: "13.08 12:30", href: "https://send.monobank.ua/jar/9yQ5osa3pF" },
+  { time: "13.08 17:00", href: "https://send.monobank.ua/jar/9washSfp2U" },
+];
+---
+
+<Layout
+  title="Зйомки шоу КОНТРЛВЕ — розклад"
+  description="Зйомки шоу КОНТРЛВЕ 13 серпня. Обирай зручний сеанс — 12:30 або 17:00 — та приходь на запис випуску."
+>
+  <main class="wrap">
+    <section class="card">
+      <img
+        class="logo"
+        src={logo.src}
+        width={logo.width}
+        height={logo.height}
+        alt="ШОУ КОНТРЛВЕ"
+        loading="eager"
+      />
+      <h1>Зйомки шоу КОНТРЛВЕ</h1>
+      <p class="lead">
+        Якщо хочеш відвідати зйомки шоу КОНТРЛВЕ - обирай зручну дату і час, роби
+        донат від 200 грн на банку - це і є твій квиток! <br />
+         Після оплати, monobank покаже посилання на реєстрацію. Реєструйся і переходь в чат. До зустрічі!
+      </p>
+      <div class="actions">
+        {sessions.map((s) => <Button href={s.href}>{s.time}</Button>)}
+      </div>
+    </section>
+  </main>
+</Layout>
+
+<style>
+  @font-face {
+    font-family: Gothic;
+    src: url("/SocialGothicBold.otf");
+    font-display: swap;
+  }
+
+  .wrap {
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+    font-family: Gothic;
+    color: #fff;
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+    max-width: 480px;
+    padding: 32px;
+    box-sizing: border-box;
+    background: rgba(10, 10, 10, 0.75);
+    border-radius: 16px;
+    backdrop-filter: blur(6px);
+  }
+
+  .logo {
+    max-width: clamp(120px, 40vw, 200px);
+    height: auto;
+    aspect-ratio: 600 / 214;
+  }
+
+  h1 {
+    margin: 0;
+    text-align: center;
+    font-size: clamp(1.5rem, 6vw, 2.5rem);
+    line-height: 1.1;
+    font-weight: inherit;
+  }
+
+  .actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+
+    @media (max-width: 600px) {
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+  }
+</style>

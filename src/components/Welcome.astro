@@ -39,7 +39,10 @@ const firstRule = [
         <li>поки все</li>
       </ol>
     </div>
-    <Button href={buttonHref}>Дивитись</Button>
+    <div class="cta">
+      <Button href={buttonHref}>Дивитись</Button>
+      <a class="events-link" href="/events">Події</a>
+    </div>
   </div>
   <div id="photos">
     <img class="photo" id="myhal" src={myhal.src} width={myhal.width} height={myhal.height} alt="Антон Мигаль — ШОУ КОНТРЛВЕ" loading="eager" />
@@ -109,6 +112,27 @@ const firstRule = [
     font-size: inherit;
     font-weight: inherit;
     line-height: 1;
+  }
+
+  .cta {
+    display: flex;
+    align-items: center;
+    gap: clamp(12px, 2vw, 24px);
+  }
+
+  .events-link {
+    font-family: Gothic;
+    font-size: 1rem;
+    color: #fff;
+    text-decoration: none;
+    opacity: 0.75;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+    padding-bottom: 2px;
+    transition: opacity 0.2s ease;
+  }
+
+  .events-link:hover {
+    opacity: 1;
   }
 
   .rules {

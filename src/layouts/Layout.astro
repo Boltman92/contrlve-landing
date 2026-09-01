@@ -36,18 +36,27 @@ const seo = Astro.props;
   html {
     margin: 0;
     width: 100%;
-    height: 100%;
-    height: 100dvh;
+    /* min-height, not height: with a fixed 100dvh box the background is sized
+       to one viewport and tiles down a longer page. */
+    min-height: 100%;
+    min-height: 100dvh;
     background-color: #0a0a0a;
     background-image: url("/background.webp");
     background-size: cover;
     background-position: center;
+    background-repeat: no-repeat;
+    /* Pins the image to the viewport so it never repeats or drifts while
+       scrolling. If a browser ignores `fixed`, min-height above still grows the
+       background box, so `cover` fills it rather than tiling. */
+    background-attachment: fixed;
   }
 
   body {
     margin: 0;
     width: 100%;
-    height: 100%;
-    height: 100dvh;
+    /* Also min-height, so a page taller than the viewport is not overflowing a
+       fixed-height box. Pages that want an exact viewport set it themselves. */
+    min-height: 100%;
+    min-height: 100dvh;
   }
 </style>

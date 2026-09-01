@@ -1,9 +1,23 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "contrlve-landing",
-  "compatibility_date": "2025-05-01",
-  "compatibility_flags": ["nodejs_compat"],
-  "observability": {
-    "enabled": true
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "contrlve-landing",
+	"compatibility_date": "2025-05-01",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"observability": {
+		"enabled": true
+	},
+	// Anonymous /events click analytics. A binding, not a network service:
+	// there is no connection string or API key anywhere in this repo.
+	// The binding MUST stay named "DB" — that is what the code reads as env.DB.
+	// `wrangler d1 create` suggests a snippet that names it after the database;
+	// take only the database_id from it.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "contrlve-stats",
+			"database_id": "091840c4-afc6-4fbb-9ef0-568d14d97390"
+		}
+	]
 }

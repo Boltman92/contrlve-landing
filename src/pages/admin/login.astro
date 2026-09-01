@@ -1,0 +1,111 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Button from "../../components/Button.astro";
+import { createSession, hasValidSession, isPasswordCorrect } from "../../lib/auth";
+
+export const prerender = false;
+
+// Only ever redirect back into this site.
+const requested = Astro.url.searchParams.get("next") ?? "";
+const next =
+  requested.startsWith("/") && !requested.startsWith("//")
+    ? requested
+    : "/admin/stats";
+
+let error: string | null = null;
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (isPasswordCorrect(String(form.get("password") ?? ""))) {
+    await createSession(Astro);
+    return Astro.redirect(next, 302);
+  }
+  // Small delay so the endpoint is not a fast password oracle.
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  error = "Невірний пароль";
+} else if (await hasValidSession(Astro)) {
+  return Astro.redirect(next, 302);
+}
+
+Astro.response.headers.set("Cache-Control", "no-store");
+---
+
+<Layout title="Вхід — статистика" noindex>
+  <main class="wrap">
+    <form class="card" method="post">
+      <h1>Статистика</h1>
+      <input
+        type="password"
+        name="password"
+        placeholder="Пароль"
+        autocomplete="current-password"
+        required
+        autofocus
+      />
+      {error && <p class="error">{error}</p>}
+      <Button>Увійти</Button>
+    </form>
+  </main>
+</Layout>
+
+<style>
+  @font-face {
+    font-family: Gothic;
+    src: url("/SocialGothicBold.otf");
+    font-display: swap;
+  }
+
+  .wrap {
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+    font-family: Gothic;
+    color: #fff;
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+    max-width: 360px;
+    padding: 32px;
+    box-sizing: border-box;
+    background: rgba(10, 10, 10, 0.75);
+    border-radius: 16px;
+    backdrop-filter: blur(6px);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(1.3rem, 5vw, 2rem);
+    font-weight: inherit;
+  }
+
+  input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.65rem 1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-family: Gothic;
+    font-size: 1rem;
+  }
+
+  input:focus {
+    outline: 2px solid #e5091a;
+    outline-offset: 2px;
+  }
+
+  .error {
+    margin: 0;
+    color: #e5091a;
+    font-size: 0.9rem;
+  }
+</style>

@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /go/
 
 Sitemap: https://contrlve.com.ua/sitemap-index.xml

@@ -1,0 +1,418 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { Image } from "astro:assets";
+import logo from "../assets/logo.webp";
+import { getCollection } from "astro:content";
+import { SITE_NAME, SITE_URL } from "../consts";
+
+export const prerender = true;
+
+const all = await getCollection("events");
+
+// The page is prerendered, so "past" is decided at build time: an event only
+// drops off the list on the next deploy.
+const now = Date.now();
+
+// Priority events come first; date order applies within each group, so the
+// list still reads chronologically wherever nothing is pinned.
+const upcoming = all
+  .filter((event) => event.data.date.getTime() >= now)
+  .sort(
+    (a, b) =>
+      Number(b.data.priority) - Number(a.data.priority) ||
+      a.data.date.getTime() - b.data.date.getTime(),
+  );
+
+const dateFormatter = new Intl.DateTimeFormat("uk-UA", {
+  timeZone: "Europe/Kyiv",
+  day: "numeric",
+  month: "long",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+const jsonLd = upcoming.map((event) => ({
+  "@context": "https://schema.org",
+  "@type": "Event",
+  name: event.data.title,
+  startDate: event.data.date.toISOString(),
+  eventStatus:
+    event.data.status === "cancelled"
+      ? "https://schema.org/EventCancelled"
+      : "https://schema.org/EventScheduled",
+  eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+  location: {
+    "@type": "Place",
+    name: event.data.venue ?? event.data.city ?? "Київ",
+    address: event.data.address ?? event.data.city ?? "Київ",
+  },
+  organizer: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
+  url: `${SITE_URL}/events`,
+}));
+---
+
+<Layout
+  title="Події ШОУ КОНТРЛВЕ — зйомки та виступи"
+  description="Найближчі зйомки шоу КОНТРЛВЕ. Обирай зручний сеанс і приходь на запис випуску."
+>
+  <main class="wrap">
+    <section class="card">
+      <a href="/" class="logo-link">
+        <img
+          class="logo"
+          src={logo.src}
+          width={logo.width}
+          height={logo.height}
+          alt="ШОУ КОНТРЛВЕ"
+          loading="eager"
+        />
+      </a>
+      <h1>Купити квитки</h1>
+
+      {
+        upcoming.length === 0 && (
+          <p class="lead empty">
+            Зараз немає запланованих подій. Слідкуй за анонсами — нові зйомки
+            з'являться тут.
+          </p>
+        )
+      }
+
+      {
+        upcoming.length > 0 && (
+          <div class="grid">
+            {upcoming.map((event) => {
+              // A card is a link only when there is somewhere to send people.
+              const clickable =
+                event.data.status === "upcoming" && Boolean(event.data.url);
+              const Tag = clickable ? "a" : "div";
+
+              return (
+                <Tag
+                  class:list={["event", { "is-static": !clickable }]}
+                  data-slug={event.id}
+                  href={clickable ? `/go/${event.id}` : undefined}
+                  target={clickable ? "_blank" : undefined}
+                  rel={clickable ? "nofollow noopener" : undefined}
+                >
+                  <div class="cover">
+                    {event.data.cover ? (
+                      <Image
+                        src={event.data.cover}
+                        alt={event.data.title}
+                        widths={[240, 480, 720, 960]}
+                        {/* Mobile: 85% of the scroller's content box, which is
+                            the viewport less .wrap and .grid padding (52px).
+                            Desktop: --card-width caps at 200px. */}
+                        sizes="(max-width: 600px) calc(85vw - 44px), 200px"
+                      />
+                    ) : (
+                      <img class="cover-fallback" src={logo.src} alt="" />
+                    )}
+                    {event.data.status !== "upcoming" && (
+                      <span class="badge">
+                        {event.data.status === "soldout"
+                          ? "Місць немає"
+                          : "Скасовано"}
+                      </span>
+                    )}
+                  </div>
+
+                  <div class="body">
+                    <p class="title">{event.data.title}</p>
+                    <p class="date">{dateFormatter.format(event.data.date)}</p>
+                    {(event.data.venue || event.data.city) && (
+                      <p class="where">
+                        {[event.data.venue, event.data.city]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    )}
+                    {event.data.note && <p class="note">{event.data.note}</p>}
+                  </div>
+                </Tag>
+              );
+            })}
+          </div>
+        )
+      }
+    </section>
+  </main>
+
+  {
+    jsonLd.length > 0 && (
+      <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    )
+  }
+</Layout>
+
+<script>
+  // /events is prerendered, so the traffic source can only be read here on the
+  // client. Carry it onto the tracked card links, then report a single page
+  // view that every event's click-through rate is measured against.
+  const params = new URLSearchParams(location.search);
+  const utm = {
+    utm_source: params.get("utm_source"),
+    utm_medium: params.get("utm_medium"),
+    utm_campaign: params.get("utm_campaign"),
+  };
+
+  for (const link of document.querySelectorAll('a[href^="/go/"]')) {
+    const url = new URL(link.href);
+    for (const [key, value] of Object.entries(utm)) {
+      if (value) url.searchParams.set(key, value);
+    }
+    link.href = url.pathname + url.search;
+  }
+
+  const body = JSON.stringify({ ref: document.referrer, ...utm });
+  navigator.sendBeacon?.(
+    "/api/view",
+    new Blob([body], { type: "application/json" }),
+  );
+</script>
+
+<style>
+  @font-face {
+    font-family: Gothic;
+    src: url("/SocialGothicBold.otf");
+    font-display: swap;
+  }
+
+  .wrap {
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+    font-family: Gothic;
+    color: #fff;
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+    max-width: 860px;
+    padding: 32px;
+    margin: 24px 0;
+    box-sizing: border-box;
+    background: rgba(10, 10, 10, 0.75);
+    border-radius: 16px;
+    backdrop-filter: blur(6px);
+  }
+
+  .logo {
+    max-width: clamp(120px, 40vw, 200px);
+    height: auto;
+    aspect-ratio: 600 / 214;
+  }
+
+  .logo-link {
+    display: block;
+    line-height: 0;
+  }
+
+  h1 {
+    margin: 0;
+    text-align: center;
+    font-size: clamp(1.5rem, 6vw, 2.5rem);
+    line-height: 1.1;
+    font-weight: inherit;
+  }
+
+  .lead {
+    margin: 0;
+    line-height: 1.4;
+    opacity: 0.85;
+    text-align: center;
+  }
+
+  .grid {
+    /*
+     * Card width is derived from the viewport height rather than the container
+     * width, so a single row of cards always fits on screen without scrolling.
+     * The 9:16 poster is the only variable part of the page's height; 420px is
+     * everything else stacked up (page and panel padding, logo, heading, gaps
+     * and the text under each poster), rounded up for breathing room.
+     *
+     * auto-fit (not auto-fill) collapses the empty tracks so `justify-content`
+     * can centre one card instead of stranding it at the left edge.
+     */
+    --card-width: clamp(120px, calc((100dvh - 420px) * 9 / 16), 200px);
+
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, var(--card-width)));
+    justify-content: center;
+    gap: 20px;
+    width: 100%;
+  }
+
+  /* The whole card is the click target. */
+  .event {
+    display: flex;
+    flex-direction: column;
+    color: inherit;
+    text-decoration: none;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    overflow: hidden;
+    transition:
+      transform 0.15s ease,
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  .event:hover {
+    transform: translateY(-4px);
+    border-color: #e5091a;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  }
+
+  .event:active {
+    transform: translateY(-1px);
+  }
+
+  .event:focus-visible {
+    outline: 2px solid #e5091a;
+    outline-offset: 3px;
+  }
+
+  /* Not clickable: no ticket link, or sold out / cancelled. */
+  .event.is-static {
+    opacity: 0.65;
+  }
+
+  .event.is-static:hover {
+    transform: none;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+  }
+
+  .cover {
+    position: relative;
+    /* Matches the 9:16 story posters the show produces, so a full-bleed poster
+       is never centre-cropped into losing its sponsor logos or bottom badge. */
+    aspect-ratio: 9 / 16;
+    background: linear-gradient(160deg, #2a0206, #0a0a0a);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+
+  .cover :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* The logo stand-in must not be cropped like a real poster would be. */
+  .cover .cover-fallback {
+    width: 70%;
+    height: auto;
+    object-fit: contain;
+    opacity: 0.55;
+  }
+
+  .badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(10, 10, 10, 0.85);
+    font-size: 0.7rem;
+  }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 12px;
+  }
+
+  .title {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.25;
+  }
+
+  .date {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #e5091a;
+  }
+
+  .where,
+  .note {
+    margin: 0;
+    font-size: 0.75rem;
+    opacity: 0.6;
+    line-height: 1.3;
+  }
+
+  .note {
+    color: #e5091a;
+    opacity: 1;
+  }
+
+  /* Phones. Kept as a plain top-level query rather than nested inside each
+     rule: nested @media containing only declarations relies on the CSS nested
+     declarations rule (Safari 17.4+ / Chrome 130+), and is silently dropped by
+     older mobile Safari. */
+  @media (max-width: 600px) {
+    .wrap {
+      /* A short page centred vertically wastes the top of the screen, and a
+         tall one pushes the logo out of view. Start from the top. */
+      align-items: flex-start;
+      padding: 12px;
+    }
+
+    .card {
+      margin: 0;
+      padding: 20px 14px 24px;
+      gap: 18px;
+    }
+
+    /* Cards become a snapping horizontal carousel. The next card is left
+       deliberately part-visible so it reads as scrollable without needing a
+       hint or arrows. */
+    .grid {
+      display: flex;
+      justify-content: flex-start;
+      overflow-x: auto;
+      gap: 12px;
+      scroll-snap-type: x mandatory;
+      /* Break out of the panel padding so cards run to the screen edge, then
+         re-apply it inside so the first and last card still line up with the
+         heading above. */
+      margin: 0 -14px;
+      padding: 0 14px;
+      scroll-padding: 0 14px;
+      /* Stops a horizontal swipe from triggering the browser's back gesture. */
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+    }
+
+    .grid::-webkit-scrollbar {
+      display: none;
+    }
+
+    .event {
+      /* ~18% of the next card stays on screen (about 50px on a 375px phone). */
+      flex: 0 0 85%;
+      scroll-snap-align: start;
+    }
+
+    /* Nothing to scroll to: let a lone event fill the width instead of
+       leaving a gap where the peek would be. */
+    .event:only-child {
+      flex-basis: 100%;
+    }
+  }
+</style>

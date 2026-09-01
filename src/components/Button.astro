@@ -2,18 +2,27 @@
 interface Props {
   label?: string;
   href?: string;
+  rel?: string;
+  target?: string;
+  class?: string;
 }
 
-const { label = "Дивитись", href } = Astro.props;
+const {
+  label = "Дивитись",
+  href,
+  rel,
+  target,
+  class: className,
+} = Astro.props;
 ---
 
 {
   href ? (
-    <a href={href} class="btn">
+    <a href={href} class:list={["btn", className]} rel={rel} target={target}>
       <slot>{label}</slot>
     </a>
   ) : (
-    <button class="btn">
+    <button class:list={["btn", className]}>
       <slot>{label}</slot>
     </button>
   )

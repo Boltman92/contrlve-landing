@@ -9,11 +9,18 @@
     "dev": "astro dev --host",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "cf-typegen": "wrangler types",
+    "db:migrate:local": "wrangler d1 migrations apply contrlve-stats --local",
+    "db:migrate:remote": "wrangler d1 migrations apply contrlve-stats --remote"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^13.5.3",
     "@astrojs/sitemap": "^3.7.3",
     "astro": "^6.1.8"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.0",
+    "wrangler": "^4.93.0"
   }
 }

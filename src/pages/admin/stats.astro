@@ -1,0 +1,462 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getCollection } from "astro:content";
+import {
+  BREAKDOWNS,
+  RANGES,
+  StatsUnavailableError,
+  isRangeKey,
+  loadStats,
+  rangeStart,
+  type BreakdownKey,
+  type RangeKey,
+  type Stats,
+} from "../../lib/stats";
+
+export const prerender = false;
+
+const requested = Astro.url.searchParams.get("range");
+const range: RangeKey = isRangeKey(requested) ? requested : "30";
+
+let stats: Stats | null = null;
+let setupHint: string | null = null;
+
+try {
+  stats = await loadStats(rangeStart(range));
+} catch (error) {
+  if (error instanceof StatsUnavailableError) setupHint = error.hint;
+  else throw error;
+}
+
+// Slugs come from the database; the collection supplies human titles for the
+// ones that still exist.
+const events = await getCollection("events");
+const titleOf = (slug: string) =>
+  events.find((event) => event.id === slug)?.data.title ?? slug;
+
+// Not a conversion rate: cards open in a new tab, so one page view can produce
+// several clicks and this legitimately goes above 1.
+const clicksPerView =
+  stats && stats.totals.views > 0
+    ? stats.totals.clicks / stats.totals.views
+    : null;
+
+const breakdownKeys = Object.keys(BREAKDOWNS) as BreakdownKey[];
+
+// Longest bar in the per-event list.
+const topEventClicks = Math.max(1, ...(stats?.events ?? []).map((e) => e.clicks));
+
+const dayFormatter = new Intl.DateTimeFormat("uk-UA", {
+  timeZone: "Europe/Kyiv",
+  day: "2-digit",
+  month: "2-digit",
+});
+const formatDay = (day: string) => dayFormatter.format(new Date(`${day}T12:00:00Z`));
+
+const peakDay = stats
+  ? Math.max(1, ...stats.timeline.map((point) => point.views + point.clicks))
+  : 1;
+
+Astro.response.headers.set("Cache-Control", "no-store");
+---
+
+<Layout title="Статистика подій" noindex>
+  <main class="wrap">
+    <div class="panel">
+      <header>
+        <h1>Статистика подій</h1>
+        <nav class="ranges">
+          {
+            (Object.keys(RANGES) as RangeKey[]).map((key) => (
+              <a
+                href={`/admin/stats?range=${key}`}
+                class:list={["chip", { active: key === range }]}
+              >
+                {RANGES[key].label}
+              </a>
+            ))
+          }
+        </nav>
+      </header>
+
+      {setupHint && <p class="hint">{setupHint}</p>}
+
+      {
+        stats && (
+          <>
+            <section class="tiles">
+              <div class="tile">
+                <span class="value">{stats.totals.clicks}</span>
+                <span class="label">кліків</span>
+              </div>
+              <div class="tile">
+                <span class="value">{stats.totals.clickers}</span>
+                <span class="label">унікальних клікнули</span>
+              </div>
+              <div class="tile">
+                <span class="value">{stats.totals.views}</span>
+                <span class="label">переглядів сторінки</span>
+              </div>
+              <div class="tile">
+                <span class="value">{stats.totals.visitors}</span>
+                <span class="label">унікальних відвідувачів</span>
+              </div>
+              <div class="tile">
+                <span class="value">
+                  {clicksPerView === null ? "—" : clicksPerView.toFixed(1)}
+                </span>
+                <span class="label">кліків на перегляд</span>
+              </div>
+            </section>
+
+            <section>
+              <h2>Події</h2>
+              {stats.events.length === 0 && <p class="empty">Поки що немає даних.</p>}
+              {stats.events.map((event) => (
+                <article class="event">
+                  <h3>{titleOf(event.slug)}</h3>
+                  <p class="meta">
+                    {event.clicks} кліків · {event.clickers} унікальних
+                    {stats.totals.views > 0 &&
+                      ` · ${Math.round((event.clicks / stats.totals.views) * 100)}% від переглядів`}
+                  </p>
+                  <div class="bar-row">
+                    <span class="bar-track">
+                      <span
+                        class="bar-fill"
+                        style={`width:${Math.max(2, Math.round((event.clicks / Math.max(1, topEventClicks)) * 100))}%`}
+                      />
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </section>
+
+            <section>
+              <h2>Звідки кліки</h2>
+              <p class="sub">Розподіл по кліках, не по переглядах.</p>
+              <div class="grid">
+                {breakdownKeys.map((key) => {
+                  const rows = stats.breakdowns[key];
+                  const max = Math.max(1, ...rows.map((row) => row.clicks));
+                  return (
+                    <div class="block">
+                      <h3>{BREAKDOWNS[key]}</h3>
+                      {rows.length === 0 && <p class="empty">—</p>}
+                      {rows.map((row) => (
+                        <div class="bar-row">
+                          <span class="bar-label">{row.key}</span>
+                          <span class="bar-track">
+                            <span
+                              class="bar-fill"
+                              style={`width:${Math.max(2, Math.round((row.clicks / max) * 100))}%`}
+                            />
+                          </span>
+                          <span class="bar-value">{row.clicks}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section>
+              <h2>По днях</h2>
+              {stats.timeline.length === 0 && <p class="empty">—</p>}
+              {stats.timeline.length > 0 && (
+                <div class="timeline">
+                  {stats.timeline.map((point) => (
+                    <div class="day">
+                      <div class="stack" title={`${point.views} переглядів, ${point.clicks} кліків`}>
+                        <span
+                          class="seg views"
+                          style={`height:${Math.round((point.views / peakDay) * 100)}%`}
+                        />
+                        <span
+                          class="seg clicks"
+                          style={`height:${Math.round((point.clicks / peakDay) * 100)}%`}
+                        />
+                      </div>
+                      <span class="day-label">{formatDay(point.day)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p class="sub">
+                Дні рахуються за UTC. <span class="key views" /> перегляди
+                <span class="key clicks" /> кліки
+              </p>
+            </section>
+          </>
+        )
+      }
+
+      <footer>
+        <a href={`/admin/stats.csv?range=${range}`}>Завантажити CSV</a>
+        <a href="/admin/logout">Вийти</a>
+      </footer>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  @font-face {
+    font-family: Gothic;
+    src: url("/SocialGothicBold.otf");
+    font-display: swap;
+  }
+
+  .wrap {
+    min-height: 100dvh;
+    padding: 24px;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    font-family: Gothic;
+    color: #fff;
+  }
+
+  .panel {
+    width: 100%;
+    max-width: 860px;
+    padding: 28px;
+    box-sizing: border-box;
+    background: rgba(10, 10, 10, 0.8);
+    border-radius: 16px;
+    backdrop-filter: blur(6px);
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(1.3rem, 4vw, 1.9rem);
+    font-weight: inherit;
+  }
+
+  h2 {
+    margin: 0 0 4px;
+    font-size: 1.1rem;
+    font-weight: inherit;
+    opacity: 0.8;
+  }
+
+  h3 {
+    margin: 0 0 6px;
+    font-size: 0.95rem;
+    font-weight: inherit;
+  }
+
+  .ranges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .chip {
+    padding: 0.3rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    text-decoration: none;
+    font-size: 0.85rem;
+  }
+
+  .chip.active {
+    background: #e5091a;
+    border-color: #e5091a;
+  }
+
+  .hint {
+    margin: 0;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: rgba(229, 9, 26, 0.15);
+    border: 1px solid rgba(229, 9, 26, 0.4);
+    line-height: 1.5;
+    font-size: 0.9rem;
+  }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85em;
+  }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+  }
+
+  .tile {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .value {
+    font-size: 1.6rem;
+    line-height: 1;
+  }
+
+  .label {
+    font-size: 0.75rem;
+    opacity: 0.6;
+  }
+
+  .sub {
+    margin: 4px 0 0;
+    font-size: 0.75rem;
+    opacity: 0.5;
+  }
+
+  .empty {
+    margin: 0;
+    opacity: 0.5;
+    font-size: 0.9rem;
+  }
+
+  .event {
+    padding: 14px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .meta {
+    margin: 0 0 10px;
+    font-size: 0.85rem;
+    opacity: 0.6;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+  }
+
+  .event .bar-row {
+    grid-template-columns: 1fr;
+  }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: minmax(70px, 30%) 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 3px 0;
+    font-size: 0.85rem;
+  }
+
+  .bar-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0.8;
+  }
+
+  .bar-track {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    display: block;
+    height: 100%;
+    background: #e5091a;
+    border-radius: 999px;
+  }
+
+  .bar-value {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.8;
+  }
+
+  .bar-value em {
+    font-style: normal;
+    opacity: 0.5;
+  }
+
+  .timeline {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    overflow-x: auto;
+    padding-top: 8px;
+  }
+
+  .day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 26px;
+  }
+
+  .stack {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 90px;
+  }
+
+  .seg {
+    width: 7px;
+    border-radius: 2px 2px 0 0;
+    min-height: 2px;
+  }
+
+  .seg.views,
+  .key.views {
+    background: rgba(255, 255, 255, 0.35);
+  }
+
+  .seg.clicks,
+  .key.clicks {
+    background: #e5091a;
+  }
+
+  .key {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    margin: 0 4px 0 10px;
+  }
+
+  .day-label {
+    font-size: 0.6rem;
+    opacity: 0.45;
+    white-space: nowrap;
+  }
+
+  footer {
+    display: flex;
+    gap: 16px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: 0.85rem;
+  }
+
+  footer a {
+    color: #fff;
+    opacity: 0.7;
+  }
+
+  footer a:hover {
+    opacity: 1;
+  }
+</style>

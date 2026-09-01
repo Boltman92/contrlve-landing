@@ -1,5 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import AdminNav from "../../components/AdminNav.astro";
 import { getCollection } from "astro:content";
 import {
   BREAKDOWNS,
@@ -63,6 +64,8 @@ Astro.response.headers.set("Cache-Control", "no-store");
 <Layout title="Статистика подій" noindex>
   <main class="wrap">
     <div class="panel">
+      <AdminNav current="stats" />
+
       <header>
         <h1>Статистика подій</h1>
         <nav class="ranges">
@@ -194,6 +197,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
 
       <footer>
         <a href={`/admin/stats.csv?range=${range}`}>Завантажити CSV</a>
+        <a href="/admin/visibility">Видимість подій</a>
         <a href="/admin/logout">Вийти</a>
       </footer>
     </div>

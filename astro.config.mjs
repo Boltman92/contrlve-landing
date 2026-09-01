@@ -7,11 +7,15 @@ import sitemap from "@astrojs/sitemap";
 export default defineConfig({
   site: "https://contrlve.com.ua",
   adapter: cloudflare({
-    // Optimize posters at build time with sharp and emit static files, instead
-    // of the adapter's default runtime transforms through the Cloudflare Images
-    // binding. /events is prerendered and has a handful of images, so this
-    // serves them straight from the CDN with no Worker invocation and no
-    // dependency on Cloudflare Images being enabled for the account.
+    // Build-time sharp optimization for prerendered pages, and no dependency on
+    // Cloudflare Images being enabled for the account.
+    //
+    // /events is rendered on demand (its list depends on /admin/visibility), so
+    // its posters are not resized at build time: the adapter serves the original
+    // file through /_image for every srcset width. That is one Worker hit per
+    // poster, cached immutably for a year, and ~100 KB per poster instead of a
+    // per-width variant. Switch this to { runtime: "cloudflare-binding" } to get
+    // real transforms back, at the cost of requiring Cloudflare Images.
     imageService: "compile",
   }),
   integrations: [

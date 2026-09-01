@@ -1,6 +1,7 @@
 import type { APIContext } from "astro";
 import { getEntry } from "astro:content";
 import { trackHit } from "../../lib/analytics";
+import { loadHiddenSlugsSafe } from "../../lib/visibility";
 
 export const prerender = false;
 
@@ -22,6 +23,12 @@ export async function GET(context: APIContext): Promise<Response> {
   if (!entry?.data.url || entry.data.status !== "upcoming") {
     return redirect(fallback);
   }
+
+  // Same for an event closed from /admin/visibility. Its card is gone from
+  // /events, so the link that used to reach it stops working too — otherwise
+  // closing an event would still leave the payment page one shared link away.
+  const hidden = await loadHiddenSlugsSafe();
+  if (hidden.has(eventSlug)) return redirect(fallback);
 
   trackHit(context, { kind: "click", eventSlug });
 

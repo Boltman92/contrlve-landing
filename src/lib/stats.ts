@@ -195,3 +195,39 @@ export async function loadStats(since: number): Promise<Stats> {
     timeline: [...timeline.values()],
   };
 }
+
+/**
+ * Click counts keyed by event slug — the same figure the dashboard shows,
+ * for surfaces that need only the numbers. Used by /admin/visibility so the
+ * decision to close an event sits next to the traffic it is getting.
+ *
+ * Never throws: the numbers are context there, and an event must stay
+ * switchable even before the analytics migration has been applied.
+ */
+export async function loadClicksBySlug(
+  since: number,
+): Promise<Map<string, EventStats>> {
+  const db = env.DB;
+  if (!db) return new Map();
+
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT event_slug, COUNT(*) AS hits, COUNT(DISTINCT visitor_id) AS uniques
+         FROM event_hits WHERE ts >= ? AND kind = 'click'
+         GROUP BY event_slug`,
+      )
+      .bind(since)
+      .all<EventRow>();
+
+    return new Map(
+      (results ?? []).map((row) => [
+        row.event_slug,
+        { slug: row.event_slug, clicks: row.hits, clickers: row.uniques },
+      ]),
+    );
+  } catch (error) {
+    console.error("event_hits read failed", error);
+    return new Map();
+  }
+}

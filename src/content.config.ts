@@ -3,7 +3,11 @@ import { glob } from "astro/loaders";
 
 /**
  * Events shown on /events. One Markdown file per event — adding an event is a
- * new file plus a deploy, no database and no admin UI involved.
+ * new file plus a deploy.
+ *
+ * The one thing that is not in these files is whether an event is currently
+ * listed: /admin/visibility keeps that switch in D1 (see lib/visibility.ts), so
+ * closing a sold-out session takes a click rather than a deploy.
  *
  * One event = one card = one ticket link. An event running several sessions
  * gets one file per session, so every card has an unambiguous click target and

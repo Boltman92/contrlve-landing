@@ -4,18 +4,26 @@ import { Image } from "astro:assets";
 import logo from "../assets/logo.webp";
 import { getCollection } from "astro:content";
 import { SITE_NAME, SITE_URL } from "../consts";
+import { loadHiddenSlugsSafe } from "../lib/visibility";
 
-export const prerender = true;
+// Rendered per request, not prerendered: the list depends on the open/close
+// switches in /admin/visibility, which have to take effect on the next page
+// load rather than the next deploy.
+export const prerender = false;
 
 const all = await getCollection("events");
 
-// The page is prerendered, so "past" is decided at build time: an event only
-// drops off the list on the next deploy.
+// Events an admin has closed. Reads as an empty set if the database is
+// unreachable, so the ticket page can never be emptied by an outage.
+const hidden = await loadHiddenSlugsSafe();
+
+// Decided per request too, so an event drops off the list the moment it starts.
 const now = Date.now();
 
 // Priority events come first; date order applies within each group, so the
 // list still reads chronologically wherever nothing is pinned.
 const upcoming = all
+  .filter((event) => !hidden.has(event.id))
   .filter((event) => event.data.date.getTime() >= now)
   .sort(
     (a, b) =>
@@ -49,6 +57,10 @@ const jsonLd = upcoming.map((event) => ({
   organizer: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
   url: `${SITE_URL}/events`,
 }));
+
+// A closed event has to disappear on the next request, so nothing — browser,
+// CDN or proxy — may hold on to a copy of the list.
+Astro.response.headers.set("Cache-Control", "no-store");
 ---
 
 <Layout
@@ -147,9 +159,10 @@ const jsonLd = upcoming.map((event) => ({
 </Layout>
 
 <script>
-  // /events is prerendered, so the traffic source can only be read here on the
-  // client. Carry it onto the tracked card links, then report a single page
-  // view that every event's click-through rate is measured against.
+  // Views are reported from the client rather than from the server render, so
+  // one row means one page a browser actually displayed. Carry the traffic
+  // source onto the tracked card links first, then report the single page view
+  // that every event's click-through rate is measured against.
   const params = new URLSearchParams(location.search);
   const utm = {
     utm_source: params.get("utm_source"),

@@ -1,0 +1,58 @@
+---
+interface Props {
+  /** Page the nav is rendered on, so its own tab reads as the current one. */
+  current: "stats" | "visibility";
+}
+
+const { current } = Astro.props;
+
+const tabs = [
+  { key: "stats", href: "/admin/stats", label: "Статистика" },
+  { key: "visibility", href: "/admin/visibility", label: "Видимість" },
+] as const;
+---
+
+<nav class="admin-nav">
+  {
+    tabs.map((tab) => (
+      <a
+        href={tab.href}
+        class:list={["tab", { active: tab.key === current }]}
+        aria-current={tab.key === current ? "page" : undefined}
+      >
+        {tab.label}
+      </a>
+    ))
+  }
+</nav>
+
+<style>
+  .admin-nav {
+    display: flex;
+    gap: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .tab {
+    padding: 0.4rem 0.9rem;
+    border-radius: 10px 10px 0 0;
+    color: #fff;
+    text-decoration: none;
+    font-size: 0.9rem;
+    opacity: 0.55;
+    /* Reserves the active tab's underline on every tab, so switching pages
+       doesn't shift the row by a pixel. */
+    border-bottom: 2px solid transparent;
+  }
+
+  .tab:hover {
+    opacity: 0.85;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .tab.active {
+    opacity: 1;
+    border-bottom-color: #e5091a;
+  }
+</style>

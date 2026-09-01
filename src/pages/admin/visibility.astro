@@ -1,0 +1,426 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import AdminNav from "../../components/AdminNav.astro";
+import { getCollection } from "astro:content";
+import { loadClicksBySlug, rangeStart } from "../../lib/stats";
+import {
+  VisibilityUnavailableError,
+  loadHiddenSlugs,
+  setHidden,
+} from "../../lib/visibility";
+
+export const prerender = false;
+
+const events = await getCollection("events");
+
+// Only what is still ahead. A past event has already dropped off /events on its
+// own, so a switch for it would toggle nothing.
+const now = Date.now();
+const upcoming = events
+  .filter((event) => event.data.date.getTime() >= now)
+  // Same order as /events, so the two lists read as the same list.
+  .sort(
+    (a, b) =>
+      Number(b.data.priority) - Number(a.data.priority) ||
+      a.data.date.getTime() - b.data.date.getTime(),
+  );
+
+let setupHint: string | null = null;
+
+// A cross-site POST is already refused twice over before this runs: Astro's
+// checkOrigin rejects a form submission from another origin, and the SameSite=Lax
+// session cookie is not sent with one in the first place.
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  const slug = String(form.get("slug") ?? "");
+  const hide = form.get("hidden") === "1";
+
+  // Only slugs that exist as event files, so the table can never collect rows
+  // for events that were never real.
+  if (!events.some((event) => event.id === slug)) {
+    return new Response("Not Found", { status: 404 });
+  }
+
+  try {
+    await setHidden(slug, hide);
+    // Post/redirect/get: a refresh must not re-submit the switch.
+    return Astro.redirect("/admin/visibility", 303);
+  } catch (error) {
+    if (error instanceof VisibilityUnavailableError) setupHint = error.hint;
+    else throw error;
+  }
+}
+
+let hidden = new Set<string>();
+if (!setupHint) {
+  try {
+    hidden = await loadHiddenSlugs();
+  } catch (error) {
+    if (error instanceof VisibilityUnavailableError) setupHint = error.hint;
+    else throw error;
+  }
+}
+
+// All-time clicks, so the switch sits next to the traffic it affects.
+const clicks = await loadClicksBySlug(rangeStart("all"));
+
+const dateFormatter = new Intl.DateTimeFormat("uk-UA", {
+  timeZone: "Europe/Kyiv",
+  day: "numeric",
+  month: "long",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+const STATUS_LABELS = {
+  soldout: "Місць немає",
+  cancelled: "Скасовано",
+} as const;
+
+Astro.response.headers.set("Cache-Control", "no-store");
+---
+
+<Layout title="Видимість подій" noindex>
+  <main class="wrap">
+    <div class="panel">
+      <AdminNav current="visibility" />
+
+      <header>
+        <h1>Видимість подій</h1>
+        <p class="sub">
+          Закрита подія зникає зі сторінки /events, і її посилання /go/… веде
+          назад на список замість каси. Зміна діє одразу, деплой не потрібен.
+        </p>
+      </header>
+
+      {setupHint && <p class="hint">{setupHint}</p>}
+
+      {
+        upcoming.length === 0 && (
+          <p class="empty">Немає майбутніх подій — усе, що є, вже минуло.</p>
+        )
+      }
+
+      {
+        upcoming.length > 0 && (
+          <ul class="events">
+            {upcoming.map((event) => {
+              const isHidden = hidden.has(event.id);
+              const stats = clicks.get(event.id);
+
+              return (
+                <li class:list={["event", { off: isHidden }]}>
+                  <div class="info">
+                    <p class="title">
+                      {event.data.title}
+                      {event.data.priority && <span class="pin">закріплено</span>}
+                    </p>
+                    <p class="meta">
+                      {dateFormatter.format(event.data.date)}
+                      {event.data.city && ` · ${event.data.city}`}
+                      {event.data.status !== "upcoming" &&
+                        ` · ${STATUS_LABELS[event.data.status]}`}
+                      {!event.data.url && " · без посилання"}
+                    </p>
+                    <p class="slug">{event.id}</p>
+                  </div>
+
+                  <a
+                    class="clicks"
+                    href="/admin/stats?range=all"
+                    title="Відкрити статистику"
+                  >
+                    <span class="value">{stats?.clicks ?? 0}</span>
+                    <span class="label">кліків</span>
+                  </a>
+
+                  <form method="post" class="toggle">
+                    <input type="hidden" name="slug" value={event.id} />
+                    <input type="hidden" name="hidden" value={isHidden ? "0" : "1"} />
+                    <button
+                      type="submit"
+                      class:list={["switch", { on: !isHidden }]}
+                      role="switch"
+                      aria-checked={!isHidden}
+                      aria-label={`${isHidden ? "Відкрити" : "Закрити"} подію ${event.data.title}`}
+                      disabled={setupHint !== null}
+                    >
+                      <span class="knob" />
+                    </button>
+                    <span class="state">{isHidden ? "Закрито" : "Відкрито"}</span>
+                  </form>
+                </li>
+              );
+            })}
+          </ul>
+        )
+      }
+
+      <footer>
+        <a href="/admin/stats">Статистика</a>
+        <a href="/events" target="_blank" rel="noopener">Подивитись /events</a>
+        <a href="/admin/logout">Вийти</a>
+      </footer>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  @font-face {
+    font-family: Gothic;
+    src: url("/SocialGothicBold.otf");
+    font-display: swap;
+  }
+
+  .wrap {
+    min-height: 100dvh;
+    padding: 24px;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    font-family: Gothic;
+    color: #fff;
+  }
+
+  .panel {
+    width: 100%;
+    max-width: 860px;
+    padding: 28px;
+    box-sizing: border-box;
+    background: rgba(10, 10, 10, 0.8);
+    border-radius: 16px;
+    backdrop-filter: blur(6px);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(1.3rem, 4vw, 1.9rem);
+    font-weight: inherit;
+  }
+
+  .sub {
+    margin: 6px 0 0;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    opacity: 0.5;
+  }
+
+  .hint {
+    margin: 0;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: rgba(229, 9, 26, 0.15);
+    border: 1px solid rgba(229, 9, 26, 0.4);
+    line-height: 1.5;
+    font-size: 0.9rem;
+  }
+
+  .empty {
+    margin: 0;
+    opacity: 0.5;
+    font-size: 0.9rem;
+  }
+
+  .events {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .event {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  /* Closed events stay legible — they are the ones most likely to be opened
+     again — but read as switched off at a glance. */
+  .event.off .info,
+  .event.off .clicks {
+    opacity: 0.45;
+  }
+
+  .info {
+    min-width: 0;
+  }
+
+  .title {
+    margin: 0;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .pin {
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    font-size: 0.65rem;
+    opacity: 0.7;
+  }
+
+  .meta {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    color: #e5091a;
+  }
+
+  .slug {
+    margin: 2px 0 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem;
+    opacity: 0.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .clicks {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    color: #fff;
+    text-decoration: none;
+  }
+
+  .clicks:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .clicks .value {
+    font-size: 1.2rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .clicks .label {
+    font-size: 0.7rem;
+    opacity: 0.5;
+  }
+
+  .toggle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    min-width: 72px;
+  }
+
+  /* Plain form submit: the page has to work with no client JavaScript, so the
+     switch is a button that posts and the server re-renders the new state. */
+  .switch {
+    width: 52px;
+    height: 30px;
+    padding: 3px;
+    box-sizing: border-box;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    display: flex;
+    justify-content: flex-start;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .switch.on {
+    background: #e5091a;
+    border-color: #e5091a;
+    justify-content: flex-end;
+  }
+
+  .switch:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+
+  .switch:focus-visible {
+    outline: 2px solid #e5091a;
+    outline-offset: 3px;
+  }
+
+  .switch:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  .knob {
+    display: block;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff;
+  }
+
+  .state {
+    font-size: 0.7rem;
+    opacity: 0.6;
+  }
+
+  footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: 0.85rem;
+  }
+
+  footer a {
+    color: #fff;
+    opacity: 0.7;
+  }
+
+  footer a:hover {
+    opacity: 1;
+  }
+
+  @media (max-width: 560px) {
+    .wrap {
+      padding: 12px;
+    }
+
+    .panel {
+      padding: 18px 14px;
+    }
+
+    /* Two columns: the switch keeps its own column on the right, the click
+       count moves under the title rather than squeezing all three. */
+    .event {
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+
+    .clicks {
+      grid-row: 2;
+      grid-column: 1;
+      flex-direction: row;
+      align-items: baseline;
+      gap: 6px;
+      padding: 0;
+      align-self: start;
+    }
+
+    .clicks .value {
+      font-size: 0.95rem;
+    }
+
+    .toggle {
+      grid-row: 1 / span 2;
+      grid-column: 2;
+    }
+  }
+</style>

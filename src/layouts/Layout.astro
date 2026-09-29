@@ -1,5 +1,6 @@
 ---
 import SEO from "../components/SEO.astro";
+import { GA_MEASUREMENT_ID } from "../consts";
 
 interface Props {
   title?: string;
@@ -11,6 +12,11 @@ interface Props {
 }
 
 const seo = Astro.props;
+
+// Production only, so local dev does not pollute the reports, and never on the
+// admin pages, whose traffic is ours rather than the audience's.
+const loadAnalytics =
+  import.meta.env.PROD && !Astro.url.pathname.startsWith("/admin");
 ---
 
 <!doctype html>
@@ -26,6 +32,27 @@ const seo = Astro.props;
     <link rel="apple-touch-icon" href="/favicon.ico" />
     <meta name="generator" content={Astro.generator} />
     <SEO {...seo} />
+    {
+      loadAnalytics && (
+        <>
+          <script
+            is:inline
+            async
+            src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+          />
+          {/* define:vars wraps this in a function, so gtag is assigned to
+              window explicitly for page scripts to call. */}
+          <script is:inline define:vars={{ id: GA_MEASUREMENT_ID }}>
+            window.dataLayer = window.dataLayer || [];
+            window.gtag = function () {
+              dataLayer.push(arguments);
+            };
+            gtag("js", new Date());
+            gtag("config", id);
+          </script>
+        </>
+      )
+    }
   </head>
   <body>
     <slot />

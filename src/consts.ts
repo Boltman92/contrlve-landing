@@ -15,3 +15,6 @@ export const OG_IMAGE_HEIGHT = 630;
 
 export const YOUTUBE_URL =
   "https://www.youtube.com/playlist?list=PLLHZWI9bLm5mu2UvhLsH6l0CW0ejyKbCd";
+
+// GA4 web stream. Public by design: it ships in every page's HTML.
+export const GA_MEASUREMENT_ID = "G-KXS5JVNQ2F";

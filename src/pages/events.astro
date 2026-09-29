@@ -178,6 +178,20 @@ Astro.response.headers.set("Cache-Control", "no-store");
     link.href = url.pathname + url.search;
   }
 
+  // The /go/ redirect happens server-side, so GA would never see the ticket
+  // click on its own. Absent in dev and when an ad blocker drops gtag.js.
+  const { gtag } = window as { gtag?: (...args: unknown[]) => void };
+  for (const link of document.querySelectorAll<HTMLAnchorElement>(
+    'a[href^="/go/"]',
+  )) {
+    link.addEventListener("click", () => {
+      gtag?.("event", "ticket_click", {
+        event_id: link.dataset.slug,
+        transport_type: "beacon",
+      });
+    });
+  }
+
   const body = JSON.stringify({ ref: document.referrer, ...utm });
   navigator.sendBeacon?.(
     "/api/view",
